@@ -1,0 +1,141 @@
+services:
+  # --- Application Services ---
+  upload-service:
+    build: ./upload-service
+    container_name: vflow_upload_service
+    environment:
+      - METADATA_API_URL=http://metadata-service:8080/videos
+      - MINIO_URL=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    depends_on:
+      - metadata-service
+      - minio
+
+  transcription-service:
+    build: ./transcription-service
+    container_name: vflow_transcription_service
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBITMQ_HOST=rabbitmq
+      - METADATA_API_URL=http://metadata-service:8080/videos
+      - MINIO_URL=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    volumes:
+      - ./transcription-service:/app # Mount the code for easy updates
+      - whisper_cache:/root/.cache/whisper # Persist the downloaded model
+    depends_on:
+      - metadata-service
+      - minio
+      - rabbitmq
+  kong-db:
+    image: postgres:13
+    container_name: vflow_kong_db
+    environment:
+      - POSTGRES_USER=kong
+      - POSTGRES_PASSWORD=kongpass
+      - POSTGRES_DB=kong
+    volumes:
+      - kong_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong -d kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  kong:
+    image: kong:3.4
+    container_name: vflow_kong_gateway
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-db
+      - KONG_PG_USER=kong
+      - KONG_PG_PASSWORD=kongpass
+      - KONG_PROXY_ACCESS_LOG=/dev/stdout
+      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+      - KONG_PROXY_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl
+    ports:
+      - "8000:8000" # The main port for client traffic
+      - "8001:8001" # The Admin API port
+    depends_on:
+      kong-db:
+        condition: service_healthy
+
+  subtitle-service:
+    build: ./subtitle-service
+    container_name: vflow_subtitle_service
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RABBITMQ_HOST=rabbitmq
+      - METADATA_API_URL=http://metadata-service:8080/videos
+      - MINIO_URL=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    volumes:
+      - ./subtitle-service:/app # Mount the code for easy updates
+      - whisper_cache:/root/.cache/whisper # Share the model cache
+    depends_on:
+      - metadata-service
+      - minio
+      - rabbitmq
+
+  metadata-service:
+      build: ./metadata-service
+      container_name: vflow_metadata_service
+      ports:
+        - "8080:8080"
+      environment:
+        # CORRECTED FORMAT: Uppercase with underscores
+        - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/vflowdb
+        - SPRING_RABBITMQ_HOST=rabbitmq
+      depends_on:
+        db:
+          condition: service_healthy
+        rabbitmq:
+          condition: service_started
+  # --- Infrastructure ---
+  db:
+    image: postgres:15-alpine
+    container_name: vflow_db
+    environment:
+      - POSTGRES_USER=vflowuser
+      - POSTGRES_PASSWORD=vflowpass
+      - POSTGRES_DB=vflowdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vflowuser -d vflowdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+      image: minio/minio:latest
+      container_name: vflow_minio
+      environment:
+        - MINIO_ROOT_USER=minioadmin
+        - MINIO_ROOT_PASSWORD=minioadmin
+      ports:
+        - "9000:9000"
+        - "9001:9001"
+      volumes:
+        - minio_data:/data
+      command: server /data --console-address ":9001"
+
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: vflow_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+volumes:
+  postgres_data:
+  minio_data:
+  whisper_cache:
+  kong_db_data:

@@ -1,0 +1,4 @@
+Flask
+requests
+boto3
+python-dotenv

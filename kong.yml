@@ -1,0 +1,9 @@
+_format_version: "2.1"
+
+services:
+- name: upload-service
+  url: http://upload-service:5000
+  routes:
+  - name: upload-route
+    paths:
+    - /upload

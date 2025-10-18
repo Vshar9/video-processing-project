@@ -1,0 +1,54 @@
+# ==================================
+# Python
+# ==================================
+# Virtual Environments: Matches 'venv', '.venv', 'env', etc. in ANY subdirectory.
+**/venv/
+**/.venv/
+**/env/
+**/.env/
+
+# Python cache files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build and distribution artifacts
+build/
+dist/
+*.egg-info/
+
+# ==================================
+# Java / Maven
+# ==================================
+# Maven build output directory
+**/target/
+*.class
+
+# Maven wrapper JAR
+.mvn/wrapper/maven-wrapper.jar
+
+# ==================================
+# IDE & OS Specific
+# ==================================
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# ==================================
+# Project-specific / Temporary
+# ==================================
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+
+# Files from your project root
+project_tree.txt
+test.mp4
